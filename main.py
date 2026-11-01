@@ -2,10 +2,9 @@ import argparse
 import secrets
 import string
 import logging
-import pyperclip
-from jinja2 import Environment, FileSystemLoader
+import hashlib
 import os
-from Crypto.Hash import SHA256
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,6 +31,7 @@ def generate_random_string(length: int, char_set: str) -> str:
         raise ValueError("Length must be a positive integer.")
     if not char_set:
         raise ValueError("Character set cannot be empty.")
+    char_set = ''.join(dict.fromkeys(char_set))
 
     try:
         return ''.join(secrets.choice(char_set) for _ in range(length))
@@ -46,6 +46,7 @@ def copy_to_clipboard(text: str) -> None:
     Args:
         text: The text to copy to the clipboard.
     """
+    import pyperclip
     try:
         pyperclip.copy(text)
         logging.info("String copied to clipboard.")
@@ -88,7 +89,7 @@ def setup_argparse() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--copy", action="store_true",
-        help="Copy the generated string to the clipboard."
+        help="Copy the generated string to the clipboard. With --hash_password, copies the derived hash value instead, because the generated string itself is not printed in that branch."
     )
     
     parser.add_argument(
@@ -98,7 +99,7 @@ def setup_argparse() -> argparse.ArgumentParser:
     
     parser.add_argument(
         "--hash_password", action="store_true",
-        help="Hashes the generated string using SHA256 (for password hashing example)."
+        help="Derive a salted hash of the generated string with PBKDF2-HMAC-SHA256 (200,000 iterations and a random salt). The generated string itself is not printed in this branch."
     )
 
     return parser
@@ -114,6 +115,7 @@ def render_template(template_path: str, context: dict) -> str:
     Returns:
         The rendered template as a string.
     """
+    from jinja2 import Environment, FileSystemLoader
     try:
         env = Environment(loader=FileSystemLoader(os.path.dirname(template_path)))
         template = env.get_template(os.path.basename(template_path))
@@ -129,6 +131,9 @@ def main():
     """
     parser = setup_argparse()
     args = parser.parse_args()
+
+    if args.hash_password and args.template:
+        parser.error("--hash_password and --template cannot be used together.")
 
     try:
         # Determine character set
@@ -153,9 +158,11 @@ def main():
         random_string = generate_random_string(args.length, char_set)
 
         if args.hash_password:
-            # Example password hashing (SHA256)
-            hashed_password = SHA256.new(random_string.encode('utf-8')).hexdigest()
-            print(f"Generated (and Hashed) Random String (SHA256): {hashed_password}")
+            salt = secrets.token_bytes(16)
+            iterations = 200000
+            derived = hashlib.pbkdf2_hmac('sha256', random_string.encode('utf-8'), salt, iterations)
+            hashed_password = f"pbkdf2_sha256${iterations}${salt.hex()}${derived.hex()}"
+            print(f"Derived hash (PBKDF2-HMAC-SHA256): {hashed_password}")
             if args.copy:
                 copy_to_clipboard(hashed_password)
         elif args.template:
@@ -175,6 +182,7 @@ def main():
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
