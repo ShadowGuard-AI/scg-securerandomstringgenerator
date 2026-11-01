@@ -31,6 +31,9 @@ def generate_random_string(length: int, char_set: str) -> str:
         raise ValueError("Length must be a positive integer.")
     if not char_set:
         raise ValueError("Character set cannot be empty.")
+    # Dropping duplicate characters is load bearing, not tidying.
+    # secrets.choice picks an index uniformly, so a character listed
+    # twice in a custom set would be twice as likely without this line.
     char_set = ''.join(dict.fromkeys(char_set))
 
     try:
@@ -145,6 +148,10 @@ def main():
             char_set = string.digits
         elif args.charset == "letters":
             char_set = string.ascii_letters
+        # The symbols set is all of string.punctuation, quotes,
+        # backslash, and shell metacharacters included. A generated
+        # string from it is not safe to paste into quoted code or a
+        # shell command without escaping, and I print it raw.
         elif args.charset == "symbols":
             char_set = string.punctuation
         elif args.charset == "custom":
@@ -176,6 +183,10 @@ def main():
             # Print the generated string
             print(f"Generated Random String: {random_string}")
 
+            # Copying runs inside this same try, and a clipboard
+            # failure is caught by the handler below as a full error
+            # exit, even though the string was already printed and the
+            # generation itself succeeded.
             # Copy to clipboard if requested
             if args.copy:
                 copy_to_clipboard(random_string)
