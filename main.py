@@ -49,11 +49,11 @@ def copy_to_clipboard(text: str) -> None:
     Args:
         text: The text to copy to the clipboard.
     """
-    import pyperclip
     try:
+        import pyperclip
         pyperclip.copy(text)
         logging.info("String copied to clipboard.")
-    except pyperclip.PyperclipException as e:
+    except Exception as e:
         logging.warning(f"Unable to copy to clipboard: {e}.  Ensure xclip or xsel is installed.")
 
 def setup_argparse() -> argparse.ArgumentParser:
@@ -118,8 +118,8 @@ def render_template(template_path: str, context: dict) -> str:
     Returns:
         The rendered template as a string.
     """
-    from jinja2 import Environment, FileSystemLoader
     try:
+        from jinja2 import Environment, FileSystemLoader
         env = Environment(loader=FileSystemLoader(os.path.dirname(template_path)))
         template = env.get_template(os.path.basename(template_path))
         return template.render(context)
@@ -183,10 +183,9 @@ def main():
             # Print the generated string
             print(f"Generated Random String: {random_string}")
 
-            # Copying runs inside this same try, and a clipboard
-            # failure is caught by the handler below as a full error
-            # exit, even though the string was already printed and the
-            # generation itself succeeded.
+            # A clipboard failure is handled inside copy_to_clipboard
+            # as a warning, so a successful generation still exits 0
+            # with the string printed.
             # Copy to clipboard if requested
             if args.copy:
                 copy_to_clipboard(random_string)
